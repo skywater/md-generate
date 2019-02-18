@@ -114,18 +114,24 @@ func GetAllFileList(path string, isSkip bool, idx int) ([]FileTree, error) {
 func dealGitBookTree(fileTree []FileTree, headStr string) string {
 	var buffer bytes.Buffer
 	for _, v := range fileTree {
-		buffer.WriteString(headStr)
-		buffer.WriteString("[" + v.Name + "](" + v.RelativePath + ")\n")
 		if v.IsDir {
 			str := dealGitBookTree(v.Leafs, "  "+headStr)
 			buffer.WriteString(str)
+		} else {
+			buffer.WriteString(headStr)
+			arr := strings.Split(v.Name, ".")
+			// 图片暂时不处理
+			if len(arr) > 1 && strings.Contains("png jpg gif bmp", strings.ToLower(arr[1])) {
+				continue
+			}
+			buffer.WriteString("[" + v.Name + "](" + v.RelativePath + ")\n")
 		}
 	}
 	return buffer.String()
 }
 
 func genGitBookTree(path string, headStr string) {
-	fileTree, _ := GetAllFileList(path, true, len("F:/src/"))
+	fileTree, _ := GetAllFileList(path, true, len("F:/src/gitNote/"))
 	jsonBytes, _ := json.Marshal(fileTree)
 	jsonStr := string(jsonBytes)
 	fmt.Println(jsonStr)
