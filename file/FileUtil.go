@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,10 +14,11 @@ import (
 )
 
 type FileTree struct {
-	Path  string
-	Name  string
-	Leafs []FileTree
-	IsDir bool
+	Path         string     `json:"path"`
+	RelativePath string     `json:"relaPath"`
+	Name         string     `json:"Node"`
+	Leafs        []FileTree `json:"Nodes,omitempty"`
+	IsDir        bool       `json:"isDir"`
 }
 
 /**
@@ -46,7 +48,7 @@ func GetCurrentPath() (string, error) {
  * 获取当前目录下所有文件、文件夹，按文件夹、命名排序；
  * isSkip表示跳过'.git'点开头的文件夹或文件
  */
-func GetCurFileList(path string, isSkip bool) ([]FileTree, bool, error) {
+func GetCurFileList(path string, isSkip bool, idx int) ([]FileTree, bool, error) {
 	i := strings.LastIndex(path, "/")
 	length := len(path)
 	if i != length-1 {
@@ -54,7 +56,9 @@ func GetCurFileList(path string, isSkip bool) ([]FileTree, bool, error) {
 	}
 	if i != length-1 {
 		path = path + "/"
+		length++
 	}
+	relativePath := path[idx:length]
 
 	// 读取目录列表
 	fileInfoList, e := ioutil.ReadDir(path)
@@ -70,8 +74,10 @@ func GetCurFileList(path string, isSkip bool) ([]FileTree, bool, error) {
 			continue
 		}
 		if v.IsDir() {
+			fileInfo := path + v.Name() + "/README.md"
+			os.OpenFile(fileInfo, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 			hasNoneDir = false
-			fileTree := FileTree{path + v.Name(), v.Name(), nil, true}
+			fileTree := FileTree{path + v.Name(), relativePath + v.Name() + "/README.md", v.Name(), nil, true}
 			slice1 = append(slice1, fileTree)
 		}
 	}
@@ -80,19 +86,19 @@ func GetCurFileList(path string, isSkip bool) ([]FileTree, bool, error) {
 			continue
 		}
 		if !v.IsDir() {
-			fileTree := FileTree{path + v.Name(), v.Name(), nil, false}
+			fileTree := FileTree{path + v.Name(), relativePath + v.Name(), v.Name(), nil, false}
 			slice1 = append(slice1, fileTree)
 		}
 	}
 	return slice1, hasNoneDir, nil
 }
 
-func GetAllFileList(path string, isSkip bool) ([]FileTree, error) {
-	fileTrees, isOver, e := GetCurFileList(path, isSkip)
+func GetAllFileList(path string, isSkip bool, idx int) ([]FileTree, error) {
+	fileTrees, isOver, e := GetCurFileList(path, isSkip, idx)
 	if !isOver {
 		for i, v := range fileTrees {
 			if v.IsDir {
-				fileTrees[i].Leafs, e = GetAllFileList(v.Path, true)
+				fileTrees[i].Leafs, e = GetAllFileList(v.Path, true, idx)
 				if nil != e {
 					break
 				}
@@ -105,19 +111,44 @@ func GetAllFileList(path string, isSkip bool) ([]FileTree, error) {
 	return fileTrees, e
 }
 
-func genGitBookTree(fileTree []FileTree) string {
-	return ""
+func dealGitBookTree(fileTree []FileTree, headStr string) string {
+	var buffer bytes.Buffer
+	for _, v := range fileTree {
+		buffer.WriteString(headStr)
+		buffer.WriteString("[" + v.Name + "](" + v.RelativePath + ")\n")
+		if v.IsDir {
+			str := dealGitBookTree(v.Leafs, "  "+headStr)
+			buffer.WriteString(str)
+		}
+	}
+	return buffer.String()
+}
+
+func genGitBookTree(path string, headStr string) {
+	fileTree, _ := GetAllFileList(path, true, len("F:/src/"))
+	jsonBytes, _ := json.Marshal(fileTree)
+	jsonStr := string(jsonBytes)
+	fmt.Println(jsonStr)
+
+	rets := dealGitBookTree(fileTree, "- ")
+	fileInfoName := path + "/README.md"
+	os.OpenFile(fileInfoName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	fileName := path + "/SUMMARY.md"
+	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
+	_, err = file.WriteString(rets)
+
+	checkErr(err)
 }
 
 func main() {
-	path := "F:/src/gitNote"
-	lst, _ := GetAllFileList(path, true)
-	fmt.Println(lst)
-	fmt.Println("---------------------")
-	json1, _ := json.Marshal(lst)
-	fmt.Println(string(json1))
+	path := "F:/src/gitNote/"
+	genGitBookTree(path, "- ")
 	fmt.Println("---------------------")
 
+	// var mapResult map[string]interface{}
+	// err := json.Unmarshal(jsonBytes, &mapResult)
+	// checkErr(err)
+	// fmt.Println(mapResult)
 	/*
 		obj1 := FileTree{"", "ddd1", nil, true}
 		obj2 := FileTree{"", "ddd2", nil, true}
@@ -130,35 +161,6 @@ func main() {
 		fmt.Println(obj2)
 		fmt.Println(obj3)
 	*/
-	fileName := path + "/test.md"
-	// 读取文件
-	fileInfo, e := os.OpenFile(fileName, os.O_RDWR, os.ModeDir)
-	if e != nil {
-		fmt.Println(fileName + "doesn't exist!")
-		// 不存在，则创建文件
-		fileInfo, e = os.Create(fileName)
-		if e != nil {
-			fmt.Println("create dir error")
-			return
-		}
-	}
-
-	// 写入内容（末尾追加），返回字节大小n
-	n, err := fileInfo.Write([]byte("白日依山尽"))
-	fmt.Println("write dir", n)
-	checkErr(err)
-	n, err = fileInfo.Write([]byte("黄河入海流"))
-	fmt.Println("write dir", n)
-	checkErr(err)
-	n, err = fileInfo.WriteString("孤帆远影碧空尽")
-	fmt.Println("write dir", n)
-	checkErr(err)
-	// 指定位置追加写入内容，会覆盖后面的内容
-	bytesContent := []byte("李白\r\n")
-	// size := len(bytesContent)
-	n, err = fileInfo.WriteAt(bytesContent, 4)
-	fmt.Println("write dir", n)
-	checkErr(err)
 }
 
 /**
