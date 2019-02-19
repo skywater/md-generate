@@ -157,9 +157,8 @@ func genGitBookTree(path string, headStr string) {
 }
 
 func main() {
-	path := "F:/src/gitNote/"
+	path, _ := GetCurrentPath()
 	genGitBookTree(path, "- ")
-	fmt.Println("---------------------")
 
 	// var mapResult map[string]interface{}
 	// err := json.Unmarshal(jsonBytes, &mapResult)
