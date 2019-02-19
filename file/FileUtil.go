@@ -3,7 +3,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
+	// "encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -114,17 +114,26 @@ func GetAllFileList(path string, isSkip bool, idx int) ([]FileTree, error) {
 func dealGitBookTree(fileTree []FileTree, headStr string) string {
 	var buffer bytes.Buffer
 	for _, v := range fileTree {
+		fileName := strings.ToUpper(v.Name)
+		if strings.EqualFold(fileName, "SUMMARY.md") || strings.EqualFold(fileName, "README.md") {
+			continue
+		}
+		arr := strings.Split(v.Name, ".")
+		suffix := ""
+		length := len(arr)
+		if length > 1 {
+			suffix = strings.ToLower(arr[length-1])
+		}
+		// 图片、压缩包、文本暂时不处理
+		if !strings.EqualFold(suffix, "") &&
+			strings.Contains("png jpg gif bmp  zip rar tar iso 7z war jar  sh bat xml pdf doc xls ppt", suffix) {
+			continue
+		}
+		buffer.WriteString(headStr)
+		buffer.WriteString("[" + v.Name + "](" + v.RelativePath + ")\n")
 		if v.IsDir {
 			str := dealGitBookTree(v.Leafs, "  "+headStr)
 			buffer.WriteString(str)
-		} else {
-			buffer.WriteString(headStr)
-			arr := strings.Split(v.Name, ".")
-			// 图片暂时不处理
-			if len(arr) > 1 && strings.Contains("png jpg gif bmp", strings.ToLower(arr[1])) {
-				continue
-			}
-			buffer.WriteString("[" + v.Name + "](" + v.RelativePath + ")\n")
 		}
 	}
 	return buffer.String()
@@ -132,15 +141,16 @@ func dealGitBookTree(fileTree []FileTree, headStr string) string {
 
 func genGitBookTree(path string, headStr string) {
 	fileTree, _ := GetAllFileList(path, true, len("F:/src/gitNote/"))
-	jsonBytes, _ := json.Marshal(fileTree)
-	jsonStr := string(jsonBytes)
-	fmt.Println(jsonStr)
+	// jsonBytes, _ := json.Marshal(fileTree)
+	// jsonStr := string(jsonBytes)
+	// fmt.Println(jsonStr)
 
 	rets := dealGitBookTree(fileTree, "- ")
 	fileInfoName := path + "/README.md"
 	os.OpenFile(fileInfoName, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
 	fileName := path + "/SUMMARY.md"
 	file, err := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0644)
+	file.Truncate(0) // 清空文本内容
 	_, err = file.WriteString(rets)
 
 	checkErr(err)
