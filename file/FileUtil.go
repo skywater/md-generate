@@ -124,9 +124,12 @@ func dealGitBookTree(fileTree []FileTree, headStr string) string {
 		if length > 1 {
 			suffix = strings.ToLower(arr[length-1])
 		}
-		// 图片、压缩包、文本暂时不处理
-		if !strings.EqualFold(suffix, "") &&
-			strings.Contains("png jpg gif bmp  zip rar tar iso 7z war jar  sh bat xml pdf doc xls ppt", suffix) {
+		// 图片、压缩包、文本、exe暂时不处理
+		if !strings.EqualFold(suffix, "") && strings.Contains(
+			`png jpg gif bmp 
+			zip rar tar iso 7z war jar 
+			sh bat exe 
+			xml pdf doc xls ppt`, suffix) {
 			continue
 		}
 		buffer.WriteString(headStr)
